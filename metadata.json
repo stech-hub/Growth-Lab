@@ -1,0 +1,8 @@
+{
+  "name": "SocialPulse AI - Growth Lab",
+  "description": "An advanced AI-driven social media growth simulator and strategy engine that uses Gemini to project follower gains, reaction spikes, and viral content strategies.",
+  "requestFramePermissions": [
+    "camera",
+    "microphone"
+  ]
+}
