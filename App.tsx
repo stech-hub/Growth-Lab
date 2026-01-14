@@ -13,6 +13,7 @@ const App: React.FC = () => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [strategy, setStrategy] = useState<GrowthStrategy | null>(null);
+  const [saveSuccess, setSaveSuccess] = useState(false);
   
   // Scorer State
   const [postDraft, setPostDraft] = useState('');
@@ -71,10 +72,21 @@ const App: React.FC = () => {
     }
   };
 
+  const isValidUrl = (url: string) => {
+    try {
+      new URL(url);
+      return true;
+    } catch (_) {
+      return false;
+    }
+  };
+
   const handleLaunchBoost = async () => {
-    if (!postUrl.trim()) return setError("Please enter a valid post URL.");
-    setLoading(true);
     setError(null);
+    if (!postUrl.trim()) return setError("Please enter a post URL.");
+    if (!isValidUrl(postUrl)) return setError("Please enter a valid URL (e.g., https://facebook.com/post/...).");
+
+    setLoading(true);
     setBoostProgress(0);
     setVisibleLogs([]);
     setBoostResult(null);
@@ -83,13 +95,13 @@ const App: React.FC = () => {
       const res = await initializeBoostSequence(postUrl, profile.platform, boostCount);
       setBoostResult(res);
       
-      // Simulate real-time log injection
       let logIndex = 0;
       if (boostIntervalRef.current) clearInterval(boostIntervalRef.current);
       
       boostIntervalRef.current = window.setInterval(() => {
         if (logIndex < res.logs.length) {
           setVisibleLogs(prev => [...prev, res.logs[logIndex]]);
+          // Ease the progress animation
           setBoostProgress((logIndex + 1) / res.logs.length * 100);
           logIndex++;
         } else {
@@ -100,6 +112,27 @@ const App: React.FC = () => {
       setError("Boost initialization failed.");
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleSaveStrategy = () => {
+    if (strategy) {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(strategy));
+      setSaveSuccess(true);
+      setTimeout(() => setSaveSuccess(false), 3000);
+    }
+  };
+
+  const handleClearStrategy = () => {
+    localStorage.removeItem(STORAGE_KEY);
+    setStrategy(null);
+  };
+
+  const getLogIcon = (status: 'info' | 'success' | 'warning') => {
+    switch (status) {
+      case 'success': return '✅';
+      case 'warning': return '⚠️';
+      default: return '🔵';
     }
   };
 
@@ -227,13 +260,24 @@ const App: React.FC = () => {
                 {error && <p className="text-red-400 text-xs font-medium">{error}</p>}
 
                 {activeTab === 'sim' && (
-                  <button 
-                    onClick={handleSimulate}
-                    disabled={loading}
-                    className="w-full py-4 bg-gradient-to-r from-indigo-600 to-cyan-500 rounded-2xl font-black text-white hover:scale-[1.02] active:scale-[0.98] transition-all disabled:opacity-50 shadow-xl shadow-indigo-500/20"
-                  >
-                    {loading ? 'Analyzing Algorithm...' : 'Unlock Growth Path'}
-                  </button>
+                  <div className="flex gap-2">
+                    <button 
+                      onClick={handleSimulate}
+                      disabled={loading}
+                      className="flex-1 py-4 bg-gradient-to-r from-indigo-600 to-cyan-500 rounded-2xl font-black text-white hover:scale-[1.02] active:scale-[0.98] transition-all disabled:opacity-50 shadow-xl shadow-indigo-500/20"
+                    >
+                      {loading ? 'Analyzing Algorithm...' : 'Unlock Growth Path'}
+                    </button>
+                    {strategy && (
+                      <button 
+                        onClick={handleClearStrategy}
+                        className="p-4 bg-red-500/10 hover:bg-red-500/20 text-red-400 border border-red-500/30 rounded-2xl transition-all"
+                        title="Clear Strategy"
+                      >
+                        🗑️
+                      </button>
+                    )}
+                  </div>
                 )}
               </div>
             </section>
@@ -262,9 +306,15 @@ const App: React.FC = () => {
                   <>
                     <div className="flex items-center justify-between mb-2">
                       <h2 className="text-3xl font-black">{strategy.title}</h2>
-                      <span className="px-3 py-1 bg-indigo-500/20 text-indigo-400 rounded-lg text-[10px] font-bold uppercase tracking-widest border border-indigo-500/30">
-                        {profile.platform} Algorithm Updated
-                      </span>
+                      <div className="flex items-center gap-3">
+                        {saveSuccess && <span className="text-xs text-green-400 font-bold animate-pulse">Strategy saved successfully!</span>}
+                        <button 
+                          onClick={handleSaveStrategy}
+                          className="px-4 py-2 bg-indigo-500/20 text-indigo-400 border border-indigo-500/30 rounded-xl text-xs font-black uppercase tracking-widest hover:bg-indigo-500/30 transition-all"
+                        >
+                          Save Strategy
+                        </button>
+                      </div>
                     </div>
 
                     <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
@@ -364,10 +414,13 @@ const App: React.FC = () => {
                 {visibleLogs.length > 0 && (
                   <div className="glass p-8 rounded-[40px] border border-white/5 space-y-6 font-mono">
                     <div className="flex justify-between items-end mb-4">
-                      <div>
+                      <div className="flex-1 mr-8">
                         <h4 className="text-xs font-bold text-indigo-400 uppercase tracking-widest mb-2">Injection Sequence Status</h4>
-                        <div className="flex gap-1 h-2 w-64 bg-slate-900 rounded-full overflow-hidden">
-                           <div className="h-full bg-indigo-500 transition-all duration-300" style={{ width: `${boostProgress}%` }}></div>
+                        <div className="relative h-3 w-full bg-slate-900 rounded-full overflow-hidden border border-white/5">
+                           <div 
+                             className="h-full bg-gradient-to-r from-indigo-500 via-cyan-400 to-purple-500 transition-all duration-700 ease-out shadow-[0_0_15px_rgba(99,102,241,0.5)]" 
+                             style={{ width: `${boostProgress}%` }}
+                           ></div>
                         </div>
                       </div>
                       <div className="text-right">
@@ -378,10 +431,11 @@ const App: React.FC = () => {
 
                     <div className="bg-black/50 p-6 rounded-2xl h-64 overflow-y-auto space-y-2 text-[11px] border border-white/5 custom-scrollbar">
                       {visibleLogs.map((log, i) => (
-                        <div key={i} className={`flex gap-4 ${log.status === 'success' ? 'text-green-400' : log.status === 'warning' ? 'text-yellow-400' : 'text-slate-400'}`}>
+                        <div key={i} className={`flex gap-4 items-center ${log.status === 'success' ? 'text-green-400' : log.status === 'warning' ? 'text-yellow-400' : 'text-slate-400'}`}>
                           <span className="opacity-30">[{log.timestamp}]</span>
+                          <span className="text-lg">{getLogIcon(log.status)}</span>
                           <span className="flex-1">>> {log.message}</span>
-                          <span className="font-bold">{log.status.toUpperCase()}</span>
+                          <span className="font-bold opacity-60">{log.status.toUpperCase()}</span>
                         </div>
                       ))}
                       {boostProgress === 100 && (
